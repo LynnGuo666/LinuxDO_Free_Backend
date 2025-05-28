@@ -32,25 +32,32 @@ class OAuthService:
             "redirect_uri": self.redirect_uri,
         }
         
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(verify=False) as client:
             try:
                 response = await client.post(
                     settings.linuxdo_token_url,
                     data=data,
                     headers={"Content-Type": "application/x-www-form-urlencoded"}
                 )
+                print(f"Token request URL: {settings.linuxdo_token_url}")
+                print(f"Token request data: {data}")
+                print(f"Token response status: {response.status_code}")
+                print(f"Token response text: {response.text}")
                 response.raise_for_status()
                 token_data = response.json()
                 return token_data.get("access_token")
             except Exception as e:
                 print(f"Token exchange error: {e}")
+                if hasattr(e, 'response'):
+                    print(f"Response status: {e.response.status_code}")
+                    print(f"Response text: {e.response.text}")
                 return None
     
     async def get_user_info(self, access_token: str) -> Optional[LinuxDOUserInfo]:
         """获取用户基本信息"""
         headers = {"Authorization": f"Bearer {access_token}"}
         
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(verify=False) as client:
             try:
                 response = await client.get(
                     settings.linuxdo_user_info_url,
@@ -67,7 +74,7 @@ class OAuthService:
         """获取用户详细统计信息（用于高级模式验证）"""
         url = settings.linuxdo_user_summary_url.format(username=username)
         
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(verify=False) as client:
             try:
                 response = await client.get(url)
                 response.raise_for_status()
