@@ -3,8 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from typing import Optional, List, Dict, Any
 from app.models.models import (
-    Benefit, BenefitClaim, BenefitCDKey, User, 
-    BenefitMode, BenefitType, BenefitVisibility,
+    Benefit, BenefitClaim, BenefitCDKey, User,
     PersonalBlacklist, GlobalBlacklist
 )
 from app.schemas.schemas import (
@@ -37,7 +36,7 @@ class BenefitService:
         query = db.query(Benefit).filter(
             and_(
                 Benefit.is_active == True,
-                Benefit.visibility == BenefitVisibility.PUBLIC
+                Benefit.visibility == "public"
             )
         )
         
@@ -75,7 +74,7 @@ class BenefitService:
         db.flush()  # 获取ID但不提交
         
         # 如果是CDKEY类型，创建CDKEY记录
-        if benefit_data.benefit_type == BenefitType.CDKEY and cdkeys_data:
+        if benefit_data.benefit_type == "cdkey" and cdkeys_data:
             for cdkey_content in cdkeys_data:
                 cdkey = BenefitCDKey(
                     benefit_id=db_benefit.id,
@@ -112,10 +111,10 @@ class BenefitService:
     
     def verify_benefit_access(self, db: Session, benefit: Benefit, access_request: BenefitAccessRequest) -> bool:
         """验证福利访问权限（私有福利密码验证）"""
-        if benefit.visibility == BenefitVisibility.PUBLIC:
+        if benefit.visibility == "public":
             return True
         
-        if benefit.visibility == BenefitVisibility.PRIVATE:
+        if benefit.visibility == "private":
             if not access_request.password:
                 return False
             return verify_password(access_request.password, benefit.access_password)
@@ -156,7 +155,7 @@ class BenefitService:
             return BenefitEligibility(eligible=False, reason="您已经领取过此福利")
         
         # CDKEY类型检查可用数量
-        if benefit.benefit_type == BenefitType.CDKEY:
+        if benefit.benefit_type == "cdkey":
             available_count = db.query(BenefitCDKey).filter(
                 and_(
                     BenefitCDKey.benefit_id == benefit.id,
@@ -167,7 +166,7 @@ class BenefitService:
                 return BenefitEligibility(eligible=False, reason="CDKEY已被领完")
         
         # CONTENT类型检查最大领取次数
-        if benefit.benefit_type == BenefitType.CONTENT:
+        if benefit.benefit_type == "content":
             if benefit.max_claims and benefit.total_claims >= benefit.max_claims:
                 return BenefitEligibility(eligible=False, reason="福利已被领完")
         
@@ -179,11 +178,11 @@ class BenefitService:
             )
         
         # 普通模式只检查信任等级
-        if benefit.mode == BenefitMode.NORMAL:
+        if benefit.mode == "normal":
             return BenefitEligibility(eligible=True)
         
         # 高级模式需要检查详细数据
-        if benefit.mode == BenefitMode.ADVANCED:
+        if benefit.mode == "advanced":
             if not user.advanced_mode_agreed:
                 return BenefitEligibility(
                     eligible=False, 
@@ -246,9 +245,9 @@ class BenefitService:
             return CDKeyClaimResult(success=False, message=eligibility.reason)
         
         # 根据福利类型处理
-        if benefit.benefit_type == BenefitType.CONTENT:
+        if benefit.benefit_type == "content":
             return await self._claim_content_benefit(db, user, benefit)
-        elif benefit.benefit_type == BenefitType.CDKEY:
+        elif benefit.benefit_type == "cdkey":
             return await self._claim_cdkey_benefit(db, user, benefit)
         else:
             return CDKeyClaimResult(success=False, message="未知的福利类型")
@@ -257,7 +256,7 @@ class BenefitService:
         """领取内容类型福利"""
         # 创建领取记录
         snapshot_data = None
-        if benefit.mode == BenefitMode.ADVANCED:
+        if benefit.mode == "advanced":
             user_summary = await oauth_service.get_user_summary(user.username)
             if user_summary:
                 snapshot_data = json.dumps(user_summary.dict())
@@ -301,7 +300,7 @@ class BenefitService:
         
         # 创建领取记录
         snapshot_data = None
-        if benefit.mode == BenefitMode.ADVANCED:
+        if benefit.mode == "advanced":
             user_summary = await oauth_service.get_user_summary(user.username)
             if user_summary:
                 snapshot_data = json.dumps(user_summary.dict())

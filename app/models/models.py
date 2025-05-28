@@ -65,12 +65,12 @@ class Benefit(Base):
     content = Column(Text, nullable=True)        # 福利内容（仅content类型使用）
     
     # 福利类型和可见性
-    benefit_type = Column(SQLEnum(BenefitType), default=BenefitType.CONTENT)  # 福利类型
-    visibility = Column(SQLEnum(BenefitVisibility), default=BenefitVisibility.PUBLIC)  # 可见性
+    benefit_type = Column(String(10), default="content")  # 福利类型: content, cdkey
+    visibility = Column(String(10), default="public")     # 可见性: public, private
     access_password = Column(String(255), nullable=True)  # 访问密码（private类型使用）
     
     # 权限配置
-    mode = Column(SQLEnum(BenefitMode), default=BenefitMode.NORMAL)  # 模式
+    mode = Column(String(10), default="normal")  # 模式: normal, advanced
     min_trust_level = Column(Integer, default=0)  # 最低信任等级
     
     # 高级模式验证条件
