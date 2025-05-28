@@ -59,7 +59,7 @@ async def oauth_callback(
             )
         
         # 创建或更新用户
-        user = user_service.create_or_update_user_from_linuxdo(db, user_info)
+        user = await user_service.create_or_update_user_from_linuxdo(db, user_info)
         
         # 生成JWT Token
         token_data = {"sub": str(user.id)}
