@@ -146,4 +146,3 @@ logs/
 
 .idea/
 .venv/
-alembic/
