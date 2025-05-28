@@ -23,15 +23,73 @@ def get_db():
         pass
 
 
+def create_test_user():
+    """创建一个测试用户"""
+    db = get_db()
+    
+    # 检查是否已有测试用户
+    test_user = db.query(User).filter(User.username == "testuser").first()
+    if test_user:
+        print("✅ 测试用户已存在")
+        return test_user
+    
+    # 创建测试用户
+    test_user = User(
+        linuxdo_id=999999,
+        username="testuser",
+        name="测试用户",
+        trust_level=2,  # Level 2 成员
+        is_active=True,
+        advanced_mode_agreed=True
+    )
+    
+    db.add(test_user)
+    db.commit()
+    db.refresh(test_user)
+    print("✅ 成功创建测试用户")
+    return test_user
+
+
+def create_test_user():
+    """创建一个测试用户"""
+    db = get_db()
+    
+    # 检查是否已有测试用户
+    test_user = db.query(User).filter(User.username == "testuser").first()
+    if test_user:
+        print("✅ 测试用户已存在")
+        db.close()
+        return test_user
+    
+    # 创建测试用户
+    test_user = User(
+        linuxdo_id=999999,
+        username="testuser",
+        name="测试用户",
+        trust_level=2,  # Level 2 成员
+        is_active=True,
+        advanced_mode_agreed=True
+    )
+    
+    db.add(test_user)
+    db.commit()
+    db.refresh(test_user)
+    db.close()
+    print("✅ 成功创建测试用户")
+    return test_user
+
+
 def create_test_benefits():
     """创建一些测试福利"""
     db = get_db()
     
-    # 创建一个测试用户作为福利创建者
+    # 创建或获取测试用户作为福利创建者
     test_user = db.query(User).first()
     if not test_user:
-        print("❌ 没有找到用户，请先通过OAuth登录一次")
-        return
+        print("📝 未找到用户，正在创建测试用户...")
+        db.close()
+        test_user = create_test_user()
+        db = get_db()
     
     # 1. 创建内容类型的普通模式福利
     normal_benefit = BenefitCreate(
@@ -308,16 +366,19 @@ def main():
     if len(sys.argv) < 2:
         print("📋 LinuxDO福利分发平台管理工具")
         print("\n使用方法:")
-        print("  python manage.py create-benefits  # 创建测试福利")
-        print("  python manage.py list-users       # 列出所有用户")
-        print("  python manage.py list-benefits    # 列出所有福利")
-        print("  python manage.py list-cdkeys      # 列出所有CDKEY状态")
-        print("  python manage.py clear-test-data  # 清理测试数据")
+        print("  python manage.py create-test-user  # 创建测试用户")
+        print("  python manage.py create-benefits   # 创建测试福利")
+        print("  python manage.py list-users        # 列出:所有用户")
+        print("  python manage.py list-benefits     # 列出所有福利")
+        print("  python manage.py list-cdkeys       # 列出所有CDKEY状态")
+        print("  python manage.py clear-test-data   # 清理测试数据")
         return
     
     command = sys.argv[1]
     
-    if command == "create-benefits":
+    if command == "create-test-user":
+        create_test_user()
+    elif command == "create-benefits":
         create_test_benefits()
     elif command == "list-users":
         list_users()

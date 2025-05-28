@@ -14,18 +14,18 @@ class UserTrustLevel(int, Enum):
 
 
 class BenefitMode(str, Enum):
-    NORMAL = "normal"
-    ADVANCED = "advanced"
+    NORMAL = "NORMAL"
+    ADVANCED = "ADVANCED"
 
 
 class BenefitType(str, Enum):
-    CONTENT = "content"  # 相同内容（权限查看，无限制）
-    CDKEY = "cdkey"      # CDKEY/兑换链接（一人一个，限量）
+    CONTENT = "CONTENT"  # 相同内容（权限查看，无限制）
+    CDKEY = "CDKEY"      # CDKEY/兑换链接（一人一个，限量）
 
 
 class BenefitVisibility(str, Enum):
-    PUBLIC = "public"    # 公开福利
-    PRIVATE = "private"  # 非公开福利（需要密码）
+    PUBLIC = "PUBLIC"    # 公开福利
+    PRIVATE = "PRIVATE"  # 非公开福利（需要密码）
 
 
 class UserBase(BaseModel):

@@ -17,18 +17,18 @@ class UserTrustLevel(enum.IntEnum):
 
 
 class BenefitMode(enum.Enum):
-    NORMAL = "normal"      # 普通模式：仅检查信任等级
-    ADVANCED = "advanced"  # 高级模式：获取详细数据验证
+    NORMAL = "NORMAL"      # 普通模式：仅检查信任等级
+    ADVANCED = "ADVANCED"  # 高级模式：获取详细数据验证
 
 
 class BenefitType(enum.Enum):
-    CONTENT = "content"    # 相同内容（权限查看，无限制）
-    CDKEY = "cdkey"        # CDKEY/兑换链接（一人一个，限量）
+    CONTENT = "CONTENT"    # 相同内容（权限查看，无限制）
+    CDKEY = "CDKEY"        # CDKEY/兑换链接（一人一个，限量）
 
 
 class BenefitVisibility(enum.Enum):
-    PUBLIC = "public"      # 公开福利
-    PRIVATE = "private"    # 非公开福利（需要密码）
+    PUBLIC = "PUBLIC"      # 公开福利
+    PRIVATE = "PRIVATE"    # 非公开福利（需要密码）
 
 
 class User(Base):
