@@ -98,6 +98,25 @@
             font-family: 'Courier New', monospace;
             overflow-x: auto;
         }
+        .benefit-type {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .type-content { background: #3498db; color: white; }
+        .type-cdkey { background: #e74c3c; color: white; }
+        .mode-normal { background: #27ae60; color: white; }
+        .mode-advanced { background: #9b59b6; color: white; }
+        .visibility-public { background: #27ae60; color: white; }
+        .visibility-private { background: #e67e22; color: white; }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
     </style>
 </head>
 <body>
@@ -157,9 +176,11 @@
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
             
+            // 始终加载公开福利列表
+            fetchBenefits();
+            
             if (currentToken) {
                 fetchUserInfo();
-                fetchBenefits();
             }
         };
 
@@ -252,12 +273,14 @@
         }
 
         async function fetchBenefits() {
+            document.getElementById('benefitsList').innerHTML = '<div class="loading">加载中...</div>';
             try {
-                const response = await fetch(`${API_BASE}/benefits`);
+                const response = await fetch(`${API_BASE}/benefits/public`);
                 const benefits = await response.json();
                 displayBenefits(benefits);
             } catch (error) {
                 console.error('获取福利列表失败:', error);
+                document.getElementById('benefitsList').innerHTML = '<p>加载失败，请刷新页面重试</p>';
             }
         }
 
@@ -267,16 +290,43 @@
                 return;
             }
 
-            const benefitsHtml = benefits.map(benefit => `
-                <div class="benefit-card">
-                    <h4>${benefit.title}</h4>
-                    <p>${benefit.description || '暂无描述'}</p>
-                    <p><strong>模式:</strong> ${benefit.mode === 'normal' ? '普通模式' : '高级模式'}</p>
-                    <p><strong>最低信任等级:</strong> Level ${benefit.min_trust_level}</p>
-                    <p><strong>领取情况:</strong> ${benefit.total_claims}${benefit.max_claims ? `/${benefit.max_claims}` : ''}</p>
-                    <button class="btn" onclick="claimBenefit(${benefit.id})">领取福利</button>
-                </div>
-            `).join('');
+            const benefitsHtml = benefits.map(benefit => {
+                const typeClass = benefit.benefit_type === 'content' ? 'type-content' : 'type-cdkey';
+                const modeClass = benefit.mode === 'normal' ? 'mode-normal' : 'mode-advanced';
+                const visibilityClass = benefit.visibility === 'public' ? 'visibility-public' : 'visibility-private';
+                
+                return `
+                    <div class="benefit-card">
+                        <h4>${benefit.title}</h4>
+                        <div style="margin: 10px 0;">
+                            <span class="benefit-type ${typeClass}">
+                                ${benefit.benefit_type === 'content' ? '📄 内容' : '🎮 CDKEY'}
+                            </span>
+                            <span class="benefit-type ${modeClass}">
+                                ${benefit.mode === 'normal' ? '📝 普通模式' : '🔍 高级模式'}
+                            </span>
+                            <span class="benefit-type ${visibilityClass}">
+                                ${benefit.visibility === 'public' ? '🌍 公开' : '🔒 私有'}
+                            </span>
+                        </div>
+                        <p>${benefit.description || '暂无描述'}</p>
+                        <p><strong>最低信任等级:</strong> 
+                            <span class="trust-level trust-${benefit.min_trust_level}">
+                                Level ${benefit.min_trust_level}
+                            </span>
+                        </p>
+                        <p><strong>领取情况:</strong> ${benefit.total_claims}${benefit.max_claims ? `/${benefit.max_claims}` : ''}</p>
+                        ${benefit.mode === 'advanced' ? 
+                            '<p><strong>⚠️ 高级模式:</strong> 需要详细数据验证</p>' : ''}
+                        <button class="btn" onclick="claimBenefit(${benefit.id})">
+                            ${benefit.benefit_type === 'cdkey' ? '🎮 领取CDKEY' : '📄 领取福利'}
+                        </button>
+                        <button class="btn" onclick="viewBenefitDetail(${benefit.id})" style="background: #95a5a6;">
+                            📋 详情
+                        </button>
+                    </div>
+                `;
+            }).join('');
 
             document.getElementById('benefitsList').innerHTML = benefitsHtml;
         }
@@ -299,10 +349,51 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    alert(`领取成功！\n\n福利内容：\n${result.data.content}`);
+                    if (result.cdkey) {
+                        alert(`领取成功！\n\nCDKEY: ${result.cdkey}\n\n请妥善保存您的CDKEY！`);
+                    } else {
+                        alert(`领取成功！\n\n${result.message || '福利已发放'}`);
+                    }
                     fetchBenefits(); // 刷新福利列表
                 } else {
                     alert('领取失败: ' + result.detail);
+                }
+            } catch (error) {
+                alert('网络错误: ' + error.message);
+            }
+        }
+
+        async function viewBenefitDetail(benefitId) {
+            try {
+                const response = await fetch(`${API_BASE}/benefits/${benefitId}`);
+                const benefit = await response.json();
+                
+                if (response.ok) {
+                    let detailText = `福利详情\n\n`;
+                    detailText += `标题: ${benefit.title}\n`;
+                    detailText += `描述: ${benefit.description || '暂无描述'}\n`;
+                    detailText += `类型: ${benefit.benefit_type === 'content' ? '内容福利' : 'CDKEY福利'}\n`;
+                    detailText += `模式: ${benefit.mode === 'normal' ? '普通模式' : '高级模式'}\n`;
+                    detailText += `可见性: ${benefit.visibility === 'public' ? '公开' : '私有'}\n`;
+                    detailText += `最低信任等级: Level ${benefit.min_trust_level}\n`;
+                    detailText += `领取情况: ${benefit.total_claims}${benefit.max_claims ? `/${benefit.max_claims}` : ''}\n`;
+                    detailText += `创建时间: ${new Date(benefit.created_at).toLocaleString()}\n`;
+                    
+                    if (benefit.mode === 'advanced') {
+                        detailText += `\n高级模式验证条件:\n`;
+                        if (benefit.min_likes_given) detailText += `- 至少给出 ${benefit.min_likes_given} 个赞\n`;
+                        if (benefit.min_likes_received) detailText += `- 至少收到 ${benefit.min_likes_received} 个赞\n`;
+                        if (benefit.min_topics_entered) detailText += `- 至少浏览 ${benefit.min_topics_entered} 个话题\n`;
+                        if (benefit.min_posts_read) detailText += `- 至少阅读 ${benefit.min_posts_read} 个帖子\n`;
+                        if (benefit.min_days_visited) detailText += `- 至少访问 ${benefit.min_days_visited} 天\n`;
+                        if (benefit.min_topic_count) detailText += `- 至少发起 ${benefit.min_topic_count} 个话题\n`;
+                        if (benefit.min_post_count) detailText += `- 至少发布 ${benefit.min_post_count} 个帖子\n`;
+                        if (benefit.min_time_read) detailText += `- 至少阅读时长 ${Math.floor(benefit.min_time_read/60)} 分钟\n`;
+                    }
+                    
+                    alert(detailText);
+                } else {
+                    alert('获取详情失败: ' + result.detail);
                 }
             } catch (error) {
                 alert('网络错误: ' + error.message);
