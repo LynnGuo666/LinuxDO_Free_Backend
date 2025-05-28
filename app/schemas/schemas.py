@@ -160,6 +160,8 @@ class LinuxDOUserInfo(BaseModel):
     active: bool
     trust_level: int
     silenced: bool
+    avatar_template: Optional[str] = None  # 头像模板URL
+    email: Optional[str] = None  # 邮箱（可选）
 
 
 class LinuxDOUserSummary(BaseModel):

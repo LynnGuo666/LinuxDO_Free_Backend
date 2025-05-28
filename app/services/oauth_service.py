@@ -32,12 +32,17 @@ class OAuthService:
             "redirect_uri": self.redirect_uri,
         }
         
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
+        }
+        
         async with httpx.AsyncClient(verify=False) as client:
             try:
                 response = await client.post(
                     settings.linuxdo_token_url,
                     data=data,
-                    headers={"Content-Type": "application/x-www-form-urlencoded"}
+                    headers=headers
                 )
                 print(f"Token request URL: {settings.linuxdo_token_url}")
                 print(f"Token request data: {data}")
@@ -55,7 +60,10 @@ class OAuthService:
     
     async def get_user_info(self, access_token: str) -> Optional[LinuxDOUserInfo]:
         """获取用户基本信息"""
-        headers = {"Authorization": f"Bearer {access_token}"}
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+        }
         
         async with httpx.AsyncClient(verify=False) as client:
             try:
@@ -73,10 +81,22 @@ class OAuthService:
     async def get_user_summary(self, username: str) -> Optional[LinuxDOUserSummary]:
         """获取用户详细统计信息（用于高级模式验证）"""
         url = settings.linuxdo_user_summary_url.format(username=username)
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Referer": "https://linux.do/",
+            "Origin": "https://linux.do",
+            "Connection": "keep-alive",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-origin"
+        }
         
         async with httpx.AsyncClient(verify=False) as client:
             try:
-                response = await client.get(url)
+                response = await client.get(url, headers=headers)
                 response.raise_for_status()
                 summary_data = response.json()
                 
@@ -87,33 +107,6 @@ class OAuthService:
                 return None
             except Exception as e:
                 print(f"User summary error: {e}")
-                return None
-    
-    async def get_user_avatar(self, username: str) -> Optional[str]:
-        """获取用户头像URL"""
-        url = f"https://linux.do/u/{username}.json"
-        
-        async with httpx.AsyncClient(verify=False) as client:
-            try:
-                response = await client.get(url)
-                response.raise_for_status()
-                user_data = response.json()
-                
-                if "user" in user_data and "avatar_template" in user_data["user"]:
-                    avatar_template = user_data["user"]["avatar_template"]
-                    # 替换 {size} 为 64
-                    avatar_url = avatar_template.replace('{size}', '64')
-                    
-                    # 如果是相对URL，添加基础URL
-                    if avatar_url.startswith('/'):
-                        avatar_url = 'https://linux.do' + avatar_url
-                    elif not avatar_url.startswith('http'):
-                        avatar_url = 'https://linux.do/' + avatar_url
-                    
-                    return avatar_url
-                return None
-            except Exception as e:
-                print(f"User avatar error: {e}")
                 return None
 
 
