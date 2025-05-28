@@ -14,6 +14,18 @@ from app.api.deps import get_current_user, get_optional_current_user
 router = APIRouter()
 
 
+@router.get("/public", response_model=List[Benefit])
+async def get_public_benefits(
+    skip: int = 0,
+    limit: int = 100,
+    current_user: Optional[User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db)
+):
+    """获取公开的活跃福利列表"""
+    benefits = benefit_service.get_public_benefits(db, current_user, skip, limit)
+    return benefits
+
+
 @router.get("/", response_model=List[Benefit])
 async def get_benefits(
     skip: int = 0,
@@ -21,7 +33,7 @@ async def get_benefits(
     current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db)
 ):
-    """获取公开的活跃福利列表"""
+    """获取公开的活跃福利列表（默认路由）"""
     benefits = benefit_service.get_public_benefits(db, current_user, skip, limit)
     return benefits
 

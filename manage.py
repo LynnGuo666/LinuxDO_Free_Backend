@@ -10,7 +10,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from sqlalchemy.orm import Session
 from app.db.database import SessionLocal
-from app.models.models import User, Benefit, BenefitClaim, BenefitMode, BenefitType, BenefitVisibility, BenefitCDKey
+from app.models.models import User, Benefit, BenefitClaim, BenefitCDKey
 from app.schemas.schemas import BenefitCreate
 from app.services.benefit_service import benefit_service
 
@@ -96,9 +96,9 @@ def create_test_benefits():
         title="🎁 新手福利包",
         description="欢迎新用户！这是一个普通模式的福利，只需要信任等级0即可领取。",
         content="恭喜获得新手福利包！\n\n内容包含：\n- 学习资料大礼包\n- 社区使用指南\n- 专属新手头像框",
-        benefit_type=BenefitType.CONTENT,
-        visibility=BenefitVisibility.PUBLIC,
-        mode=BenefitMode.NORMAL,
+        benefit_type="content",
+        visibility="public",
+        mode="normal",
         min_trust_level=0,
         max_claims=100
     )
@@ -107,9 +107,9 @@ def create_test_benefits():
     cdkey_benefit = BenefitCreate(
         title="🎮 游戏CDKEY大放送",
         description="限量游戏CDKEY，先到先得！每人限领一个。",
-        benefit_type=BenefitType.CDKEY,
-        visibility=BenefitVisibility.PUBLIC,
-        mode=BenefitMode.NORMAL,
+        benefit_type="cdkey",
+        visibility="public",
+        mode="normal",
         min_trust_level=1,
         cdkeys=[
             "GAME-KEY-001-ABCD-EFGH",
@@ -125,10 +125,10 @@ def create_test_benefits():
         title="🔒 神秘福利",
         description="这是一个神秘的私有福利，需要正确的密码才能查看和领取。密码提示：论坛名称",
         content="恭喜你找到了神秘福利！\n\n🎁 神秘大礼包内容：\n- 限定版徽章\n- 特殊权限\n- 专属头衔\n\n密码是'linuxdo'对吧？",
-        benefit_type=BenefitType.CONTENT,
-        visibility=BenefitVisibility.PRIVATE,
+        benefit_type="content",
+        visibility="private",
         access_password="linuxdo",
-        mode=BenefitMode.NORMAL,
+        mode="normal",
         min_trust_level=0,
         max_claims=50
     )
@@ -138,9 +138,9 @@ def create_test_benefits():
         title="🚀 成员专享福利",
         description="只有Level 2及以上成员才能领取的福利。",
         content="恭喜获得成员专享福利！\n\nCDKEY: MEMBER-2024-GIFT\n有效期至：2024年12月31日",
-        benefit_type=BenefitType.CONTENT,
-        visibility=BenefitVisibility.PUBLIC,
-        mode=BenefitMode.NORMAL,
+        benefit_type="content",
+        visibility="public",
+        mode="normal",
         min_trust_level=2,
         max_claims=50
     )
@@ -150,9 +150,9 @@ def create_test_benefits():
         title="🏆 活跃用户奖励",
         description="高级模式福利，需要满足详细的活跃度要求。",
         content="恭喜获得活跃用户奖励！\n\n奖励内容：\n- 高级功能访问权限\n- 专属勋章\n- VIP客服支持\n\nCDKEY: ACTIVE-USER-2024",
-        benefit_type=BenefitType.CONTENT,
-        visibility=BenefitVisibility.PUBLIC,
-        mode=BenefitMode.ADVANCED,
+        benefit_type="content",
+        visibility="public",
+        mode="advanced",
         min_trust_level=1,
         min_likes_given=50,
         min_likes_received=20,
@@ -169,9 +169,9 @@ def create_test_benefits():
         title="👑 秦始皇专属福利",
         description="只有传说中的秦始皇（Level 5）才能领取的神秘福利。",
         content="恭喜您，秦始皇陛下！\n\n🏆 您获得了至高无上的奖励：\n- 论坛终身VIP权限\n- 专属皇冠标识\n- 无限制功能访问\n- 神秘彩蛋解锁\n\nCDKEY: EMPEROR-ULTIMATE-2024\n\n愿您统一六国，一统天下！",
-        benefit_type=BenefitType.CONTENT,
-        visibility=BenefitVisibility.PUBLIC,
-        mode=BenefitMode.NORMAL,
+        benefit_type="content",
+        visibility="public",
+        mode="normal",
         min_trust_level=5,
         max_claims=1  # 限量1个，物以稀为贵
     )
@@ -229,7 +229,7 @@ def list_benefits():
         claims_info = f"{benefit.total_claims}"
         if benefit.max_claims:
             claims_info += f"/{benefit.max_claims}"
-        elif benefit.benefit_type == BenefitType.CDKEY:
+        elif benefit.benefit_type == "cdkey":
             # 对于CDKEY类型，显示可用/总数
             total_cdkeys = db.query(BenefitCDKey).filter(BenefitCDKey.benefit_id == benefit.id).count()
             available_cdkeys = db.query(BenefitCDKey).filter(
@@ -238,9 +238,9 @@ def list_benefits():
             ).count()
             claims_info = f"{available_cdkeys}/{total_cdkeys}"
         
-        benefit_type = "内容" if benefit.benefit_type == BenefitType.CONTENT else "CDKEY"
-        visibility = "公开" if benefit.visibility == BenefitVisibility.PUBLIC else "私有"
-        mode = "普通" if benefit.mode == BenefitMode.NORMAL else "高级"
+        benefit_type = "内容" if benefit.benefit_type == "content" else "CDKEY"
+        visibility = "公开" if benefit.visibility == "public" else "私有"
+        mode = "普通" if benefit.mode == "normal" else "高级"
         
         print(f"{benefit.id:<5} {benefit.title[:18]:<20} {benefit_type:<8} {visibility:<8} {mode:<8} Level {benefit.min_trust_level:<5} {claims_info:<12} {status}")
     
@@ -294,9 +294,9 @@ def show_benefit_details(benefit_id: int):
     print(f"标题: {benefit.title}")
     print(f"描述: {benefit.description}")
     print(f"创建者: {creator.username if creator else 'Unknown'}")
-    print(f"类型: {'内容福利' if benefit.benefit_type == BenefitType.CONTENT else 'CDKEY福利'}")
-    print(f"可见性: {'公开' if benefit.visibility == BenefitVisibility.PUBLIC else '私有'}")
-    print(f"模式: {'普通模式' if benefit.mode == BenefitMode.NORMAL else '高级模式'}")
+    print(f"类型: {'内容福利' if benefit.benefit_type == 'content' else 'CDKEY福利'}")
+    print(f"可见性: {'公开' if benefit.visibility == 'public' else '私有'}")
+    print(f"模式: {'普通模式' if benefit.mode == 'normal' else '高级模式'}")
     print(f"最低信任等级: Level {benefit.min_trust_level}")
     print(f"状态: {'✅ 活跃' if benefit.is_active else '❌ 停用'}")
     print(f"总领取次数: {benefit.total_claims}")
@@ -304,10 +304,10 @@ def show_benefit_details(benefit_id: int):
     if benefit.max_claims:
         print(f"最大领取次数: {benefit.max_claims}")
     
-    if benefit.benefit_type == BenefitType.CONTENT and benefit.content:
+    if benefit.benefit_type == "content" and benefit.content:
         print(f"内容: {benefit.content[:100]}...")
     
-    if benefit.benefit_type == BenefitType.CDKEY:
+    if benefit.benefit_type == "cdkey":
         total_cdkeys = db.query(BenefitCDKey).filter(BenefitCDKey.benefit_id == benefit.id).count()
         available_cdkeys = db.query(BenefitCDKey).filter(
             BenefitCDKey.benefit_id == benefit.id,
@@ -316,7 +316,7 @@ def show_benefit_details(benefit_id: int):
         print(f"CDKEY统计: {available_cdkeys}/{total_cdkeys} 可用")
     
     # 高级模式条件
-    if benefit.mode == BenefitMode.ADVANCED:
+    if benefit.mode == "advanced":
         print("\n🏆 高级模式验证条件:")
         conditions = []
         if benefit.min_likes_given: conditions.append(f"给赞数 ≥ {benefit.min_likes_given}")
