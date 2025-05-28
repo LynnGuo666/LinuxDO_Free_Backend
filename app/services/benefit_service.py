@@ -26,7 +26,7 @@ class BenefitService:
             return None
         
         # 检查个人黑名单
-        if user and self._is_user_blacklisted(db, benefit.creator_id, user.id):
+        if user and self._is_user_blacklisted(db, benefit.creator_id, user.username):
             return None
         
         return benefit
@@ -47,7 +47,7 @@ class BenefitService:
             
             # 过滤个人黑名单
             blacklisted_creators = db.query(PersonalBlacklist.creator_id).filter(
-                PersonalBlacklist.blacklisted_user_id == user.id
+                PersonalBlacklist.blacklisted_username == user.username
             ).subquery()
             
             query = query.filter(~Benefit.creator_id.in_(blacklisted_creators))
@@ -128,12 +128,12 @@ class BenefitService:
         ).first()
         return claim is not None
     
-    def _is_user_blacklisted(self, db: Session, creator_id: int, user_id: int) -> bool:
+    def _is_user_blacklisted(self, db: Session, creator_id: int, username: str) -> bool:
         """检查用户是否被创建者拉黑"""
         blacklist = db.query(PersonalBlacklist).filter(
             and_(
                 PersonalBlacklist.creator_id == creator_id,
-                PersonalBlacklist.blacklisted_user_id == user_id
+                PersonalBlacklist.blacklisted_username == username
             )
         ).first()
         return blacklist is not None
@@ -148,7 +148,7 @@ class BenefitService:
         if user.is_globally_blacklisted:
             return BenefitEligibility(eligible=False, reason="您已被全局拉黑")
         
-        if self._is_user_blacklisted(db, benefit.creator_id, user.id):
+        if self._is_user_blacklisted(db, benefit.creator_id, user.username):
             return BenefitEligibility(eligible=False, reason="您已被该福利创建者拉黑")
         
         if self.has_user_claimed(db, user.id, benefit.id):
@@ -353,13 +353,13 @@ class BenefitService:
         return db.query(BenefitCDKey).filter(BenefitCDKey.benefit_id == benefit_id).all()
     
     # 黑名单管理
-    def add_personal_blacklist(self, db: Session, creator_id: int, blacklisted_user_id: int, reason: str = None) -> bool:
+    def add_personal_blacklist(self, db: Session, creator_id: int, blacklisted_username: str, reason: str = None) -> bool:
         """添加个人黑名单"""
         # 检查是否已存在
         existing = db.query(PersonalBlacklist).filter(
             and_(
                 PersonalBlacklist.creator_id == creator_id,
-                PersonalBlacklist.blacklisted_user_id == blacklisted_user_id
+                PersonalBlacklist.blacklisted_username == blacklisted_username
             )
         ).first()
         
@@ -368,19 +368,19 @@ class BenefitService:
         
         blacklist = PersonalBlacklist(
             creator_id=creator_id,
-            blacklisted_user_id=blacklisted_user_id,
+            blacklisted_username=blacklisted_username,
             reason=reason
         )
         db.add(blacklist)
         db.commit()
         return True
     
-    def remove_personal_blacklist(self, db: Session, creator_id: int, blacklisted_user_id: int) -> bool:
+    def remove_personal_blacklist(self, db: Session, creator_id: int, blacklisted_username: str) -> bool:
         """移除个人黑名单"""
         blacklist = db.query(PersonalBlacklist).filter(
             and_(
                 PersonalBlacklist.creator_id == creator_id,
-                PersonalBlacklist.blacklisted_user_id == blacklisted_user_id
+                PersonalBlacklist.blacklisted_username == blacklisted_username
             )
         ).first()
         
@@ -394,6 +394,151 @@ class BenefitService:
     def get_personal_blacklist(self, db: Session, creator_id: int) -> List[PersonalBlacklist]:
         """获取个人黑名单"""
         return db.query(PersonalBlacklist).filter(PersonalBlacklist.creator_id == creator_id).all()
+    
+    # 新增功能方法
+    
+    def add_cdkeys_to_benefit(self, db: Session, benefit_id: int, creator_id: int, cdkeys: List[str]) -> Dict[str, Any]:
+        """向福利添加CDKEY"""
+        # 检查福利是否存在且属于创建者
+        benefit = db.query(Benefit).filter(
+            and_(
+                Benefit.id == benefit_id,
+                Benefit.creator_id == creator_id,
+                Benefit.benefit_type == "cdkey"
+            )
+        ).first()
+        
+        if not benefit:
+            return {"success": False, "message": "福利不存在或不是CDKEY类型", "added_count": 0}
+        
+        # 添加CDKEY
+        added_count = 0
+        for cdkey_content in cdkeys:
+            if cdkey_content.strip():  # 忽略空内容
+                cdkey = BenefitCDKey(
+                    benefit_id=benefit_id,
+                    cdkey_content=cdkey_content.strip()
+                )
+                db.add(cdkey)
+                added_count += 1
+        
+        db.commit()
+        return {"success": True, "message": f"成功添加 {added_count} 个CDKEY", "added_count": added_count}
+    
+    def get_user_claim_history(self, db: Session, user_id: int, skip: int = 0, limit: int = 100) -> Dict[str, Any]:
+        """获取用户的领取历史"""
+        # 查询用户的所有领取记录
+        claims_query = db.query(BenefitClaim).filter(BenefitClaim.user_id == user_id)
+        total_count = claims_query.count()
+        
+        claims = claims_query.offset(skip).limit(limit).all()
+        
+        # 构建历史记录
+        history = []
+        for claim in claims:
+            benefit = claim.benefit
+            cdkey_content = None
+            
+            # 如果是CDKEY类型，获取CDKEY内容
+            if claim.cdkey_id:
+                cdkey = db.query(BenefitCDKey).filter(BenefitCDKey.id == claim.cdkey_id).first()
+                if cdkey:
+                    cdkey_content = cdkey.cdkey_content
+            
+            history.append({
+                "id": claim.id,
+                "benefit_id": benefit.id,
+                "benefit_title": benefit.title,
+                "benefit_type": benefit.benefit_type,
+                "cdkey_content": cdkey_content,
+                "claimed_at": claim.claimed_at
+            })
+        
+        return {
+            "claims": history,
+            "total_count": total_count
+        }
+    
+    def delete_benefit(self, db: Session, benefit_id: int, creator_id: int) -> bool:
+        """删除福利（仅创建者可删除）"""
+        benefit = db.query(Benefit).filter(
+            and_(
+                Benefit.id == benefit_id,
+                Benefit.creator_id == creator_id
+            )
+        ).first()
+        
+        if not benefit:
+            return False
+        
+        # 删除相关的CDKEY记录
+        db.query(BenefitCDKey).filter(BenefitCDKey.benefit_id == benefit_id).delete()
+        
+        # 删除相关的领取记录
+        db.query(BenefitClaim).filter(BenefitClaim.benefit_id == benefit_id).delete()
+        
+        # 删除福利本身
+        db.delete(benefit)
+        db.commit()
+        return True
+    
+    def get_benefit_with_secret(self, db: Session, benefit_id: int, user: User) -> Optional[Dict[str, Any]]:
+        """获取包含秘密内容的福利详情（需要登录）"""
+        benefit = self.get_benefit_by_id(db, benefit_id, user)
+        if not benefit:
+            return None
+        
+        # 转换为字典
+        benefit_dict = {
+            "id": benefit.id,
+            "title": benefit.title,
+            "description": benefit.description,
+            "content": benefit.content,
+            "benefit_type": benefit.benefit_type,
+            "visibility": benefit.visibility,
+            "mode": benefit.mode,
+            "min_trust_level": benefit.min_trust_level,
+            "is_active": benefit.is_active,
+            "total_claims": benefit.total_claims,
+            "max_claims": benefit.max_claims,
+            "creator_id": benefit.creator_id,
+            "created_at": benefit.created_at,
+            "updated_at": benefit.updated_at,
+            "secret_content": benefit.secret if user else None  # 只有登录用户才能看到秘密内容
+        }
+        
+        return benefit_dict
+    
+    def get_user_managed_benefits(self, db: Session, creator_id: int, skip: int = 0, limit: int = 100) -> List[Dict[str, Any]]:
+        """获取用户创建的福利管理列表"""
+        benefits = db.query(Benefit).filter(
+            Benefit.creator_id == creator_id
+        ).offset(skip).limit(limit).all()
+        
+        result = []
+        for benefit in benefits:
+            # 计算可用CDKEY数量
+            available_cdkeys = 0
+            if benefit.benefit_type == "cdkey":
+                available_cdkeys = db.query(BenefitCDKey).filter(
+                    and_(
+                        BenefitCDKey.benefit_id == benefit.id,
+                        BenefitCDKey.is_claimed == False
+                    )
+                ).count()
+            
+            result.append({
+                "id": benefit.id,
+                "title": benefit.title,
+                "benefit_type": benefit.benefit_type,
+                "is_active": benefit.is_active,
+                "total_claims": benefit.total_claims,
+                "available_cdkeys": available_cdkeys,
+                "created_at": benefit.created_at
+            })
+        
+        return result
 
 
+# 创建服务实例
 benefit_service = BenefitService()

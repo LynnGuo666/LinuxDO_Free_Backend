@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from app.db.database import get_db
 from app.schemas.schemas import (
     Benefit, BenefitCreate, BenefitUpdate, BenefitClaim, 
     BenefitEligibility, ApiResponse, User, BenefitAccessRequest,
     CDKeyClaimResult, BenefitCDKey, PersonalBlacklistCreate,
-    PersonalBlacklist, CreatorStats
+    PersonalBlacklist, CreatorStats, CDKeyAdd
 )
 from app.services.benefit_service import benefit_service
 from app.api.deps import get_current_user, get_optional_current_user
@@ -237,7 +237,7 @@ async def add_to_blacklist(
 ):
     """添加用户到个人黑名单"""
     success = benefit_service.add_personal_blacklist(
-        db, current_user.id, blacklist_data.blacklisted_user_id, blacklist_data.reason
+        db, current_user.id, blacklist_data.blacklisted_username, blacklist_data.reason
     )
     
     if not success:
@@ -249,14 +249,14 @@ async def add_to_blacklist(
     return ApiResponse(success=True, message="用户已添加到黑名单")
 
 
-@router.delete("/blacklist/{user_id}", response_model=ApiResponse)
+@router.delete("/blacklist/{username}", response_model=ApiResponse)
 async def remove_from_blacklist(
-    user_id: int,
+    username: str,
     current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """从个人黑名单移除用户"""
-    success = benefit_service.remove_personal_blacklist(db, current_user.id, user_id)
+    success = benefit_service.remove_personal_blacklist(db, current_user.id, username)
     
     if not success:
         raise HTTPException(
@@ -274,3 +274,90 @@ async def get_my_blacklist(
 ):
     """获取我的个人黑名单"""
     return benefit_service.get_personal_blacklist(db, current_user.id)
+
+
+# 新增功能API端点
+
+@router.post("/{benefit_id}/cdkeys/add", response_model=ApiResponse)
+async def add_cdkeys_to_benefit(
+    benefit_id: int,
+    cdkey_data: CDKeyAdd,
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """向福利添加CDKEY（仅创建者可操作）"""
+    result = benefit_service.add_cdkeys_to_benefit(
+        db, benefit_id, current_user.id, cdkey_data.cdkeys
+    )
+    
+    if not result["success"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result["message"]
+        )
+    
+    return ApiResponse(
+        success=True, 
+        message=result["message"],
+        data={"added_count": result["added_count"]}
+    )
+
+
+@router.get("/my/history", response_model=Dict[str, Any])
+async def get_my_claim_history(
+    skip: int = 0,
+    limit: int = 100,
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """获取我的福利领取历史"""
+    history = benefit_service.get_user_claim_history(db, current_user.id, skip, limit)
+    return history
+
+
+@router.delete("/{benefit_id}", response_model=ApiResponse)
+async def delete_benefit(
+    benefit_id: int,
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """删除福利（仅创建者可删除）"""
+    success = benefit_service.delete_benefit(db, benefit_id, current_user.id)
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Benefit not found or you are not the creator"
+        )
+    
+    return ApiResponse(success=True, message="福利已删除")
+
+
+@router.get("/{benefit_id}/detail", response_model=Dict[str, Any])
+async def get_benefit_detail_with_secret(
+    benefit_id: int,
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """获取福利详情（包含秘密内容）"""
+    benefit = benefit_service.get_benefit_with_secret(db, benefit_id, current_user)
+    
+    if not benefit:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Benefit not found or access denied"
+        )
+    
+    return benefit
+
+
+@router.get("/my/managed", response_model=List[Dict[str, Any]])
+async def get_my_managed_benefits(
+    skip: int = 0,
+    limit: int = 100,
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """获取我创建的福利管理列表"""
+    benefits = benefit_service.get_user_managed_benefits(db, current_user.id, skip, limit)
+    return benefits

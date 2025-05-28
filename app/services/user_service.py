@@ -51,31 +51,67 @@ class UserService:
         db.refresh(user)
         return user
     
-    def create_or_update_user_from_linuxdo(self, db: Session, linuxdo_info: LinuxDOUserInfo) -> User:
-        """根据LinuxDO信息创建或更新用户"""
-        existing_user = self.get_user_by_linuxdo_id(db, linuxdo_info.id)
+    async def update_user_avatar(self, db: Session, user: User, username: str = None) -> User:
+        """更新用户头像"""
+        from app.services.oauth_service import oauth_service
         
-        if existing_user:
-            return self.update_user_from_linuxdo(db, existing_user, linuxdo_info)
+        # 使用传入的用户名或用户对象的用户名
+        target_username = username or user.username
+        
+        # 获取头像URL
+        avatar_url = await oauth_service.get_user_avatar(target_username)
+        
+        if avatar_url:
+            user.avatar_url = avatar_url
+            db.commit()
+            db.refresh(user)
+        
+        return user
+    
+    async def get_user_with_avatar(self, db: Session, user_id: int) -> Optional[User]:
+        """获取用户并确保有最新头像"""
+        user = self.get_user_by_id(db, user_id)
+        if user and not user.avatar_url:
+            # 如果没有头像，尝试获取
+            user = await self.update_user_avatar(db, user)
+        return user
+    
+    async def create_or_update_user_from_linuxdo(self, db: Session, linuxdo_info: LinuxDOUserInfo) -> User:
+        """根据LinuxDO信息创建或更新用户"""
+        # 查找现有用户
+        user = self.get_user_by_linuxdo_id(db, linuxdo_info.id)
+        
+        if user:
+            # 更新现有用户
+            user = self.update_user_from_linuxdo(db, user, linuxdo_info)
         else:
+            # 创建新用户
             user_data = UserCreate(
                 linuxdo_id=linuxdo_info.id,
                 username=linuxdo_info.username,
                 name=linuxdo_info.name,
                 trust_level=linuxdo_info.trust_level
             )
-            return self.create_user(db, user_data)
+            user = self.create_user(db, user_data)
+            user.is_active = linuxdo_info.active
+            user.is_silenced = linuxdo_info.silenced
+            db.commit()
+            db.refresh(user)
+        
+        # 获取或更新头像
+        if not user.avatar_url:
+            user = await self.update_user_avatar(db, user, linuxdo_info.username)
+        
+        return user
     
     def agree_to_advanced_mode(self, db: Session, user_id: int) -> Optional[User]:
         """用户同意高级模式协议"""
-        db_user = self.get_user_by_id(db, user_id)
-        if not db_user:
-            return None
-        
-        db_user.advanced_mode_agreed = True
-        db.commit()
-        db.refresh(db_user)
-        return db_user
+        user = self.get_user_by_id(db, user_id)
+        if user:
+            user.advanced_mode_agreed = True
+            db.commit()
+            db.refresh(user)
+        return user
 
 
 user_service = UserService()

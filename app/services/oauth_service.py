@@ -88,6 +88,33 @@ class OAuthService:
             except Exception as e:
                 print(f"User summary error: {e}")
                 return None
+    
+    async def get_user_avatar(self, username: str) -> Optional[str]:
+        """获取用户头像URL"""
+        url = f"https://linux.do/u/{username}.json"
+        
+        async with httpx.AsyncClient(verify=False) as client:
+            try:
+                response = await client.get(url)
+                response.raise_for_status()
+                user_data = response.json()
+                
+                if "user" in user_data and "avatar_template" in user_data["user"]:
+                    avatar_template = user_data["user"]["avatar_template"]
+                    # 替换 {size} 为 64
+                    avatar_url = avatar_template.replace('{size}', '64')
+                    
+                    # 如果是相对URL，添加基础URL
+                    if avatar_url.startswith('/'):
+                        avatar_url = 'https://linux.do' + avatar_url
+                    elif not avatar_url.startswith('http'):
+                        avatar_url = 'https://linux.do/' + avatar_url
+                    
+                    return avatar_url
+                return None
+            except Exception as e:
+                print(f"User avatar error: {e}")
+                return None
 
 
 oauth_service = OAuthService()

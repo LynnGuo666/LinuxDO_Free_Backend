@@ -39,6 +39,7 @@ class User(Base):
     username = Column(String(255), index=True, nullable=False)  # LinuxDO用户名
     name = Column(String(255), nullable=True)  # 用户昵称
     trust_level = Column(Integer, default=0)  # 信任等级 0-5
+    avatar_url = Column(String(500), nullable=True)  # 用户头像URL
     is_active = Column(Boolean, default=True)
     is_silenced = Column(Boolean, default=False)
     is_globally_blacklisted = Column(Boolean, default=False)  # 全局黑名单
@@ -53,7 +54,6 @@ class User(Base):
     
     # 创建者的个人黑名单
     personal_blacklist = relationship("PersonalBlacklist", foreign_keys="PersonalBlacklist.creator_id", back_populates="creator")
-    blacklisted_by = relationship("PersonalBlacklist", foreign_keys="PersonalBlacklist.blacklisted_user_id", back_populates="blacklisted_user")
 
 
 class Benefit(Base):
@@ -63,6 +63,7 @@ class Benefit(Base):
     title = Column(String(255), nullable=False)  # 福利标题
     description = Column(Text, nullable=True)    # 福利描述
     content = Column(Text, nullable=True)        # 福利内容（仅content类型使用）
+    secret = Column(Text, nullable=True)         # 秘密内容（需要登录才能查看）
     
     # 福利类型和可见性
     benefit_type = Column(String(10), default="content")  # 福利类型: content, cdkey
@@ -143,14 +144,13 @@ class PersonalBlacklist(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     creator_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # 创建者ID
-    blacklisted_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # 被拉黑用户ID
+    blacklisted_username = Column(String(255), nullable=False, index=True)  # 被拉黑用户名
     reason = Column(String(500), nullable=True)  # 拉黑原因
     
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # 关联
     creator = relationship("User", foreign_keys=[creator_id], back_populates="personal_blacklist")
-    blacklisted_user = relationship("User", foreign_keys=[blacklisted_user_id], back_populates="blacklisted_by")
 
 
 class GlobalBlacklist(Base):
@@ -158,12 +158,11 @@ class GlobalBlacklist(Base):
     __tablename__ = "global_blacklists"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    blacklisted_username = Column(String(255), nullable=False, index=True)  # 被拉黑用户名
     reason = Column(String(500), nullable=True)  # 拉黑原因
     admin_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # 执行拉黑的管理员ID
     
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # 关联
-    user = relationship("User", foreign_keys=[user_id])
     admin = relationship("User", foreign_keys=[admin_id])

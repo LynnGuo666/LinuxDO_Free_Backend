@@ -54,6 +54,7 @@ class User(UserBase):
     is_silenced: bool
     is_globally_blacklisted: bool
     advanced_mode_agreed: bool
+    avatar_url: Optional[str] = None  # 用户头像URL
     created_at: datetime
     updated_at: datetime
 
@@ -65,6 +66,7 @@ class BenefitBase(BaseModel):
     title: str
     description: Optional[str] = None
     content: Optional[str] = None  # 仅content类型使用
+    secret: Optional[str] = None   # 秘密内容（需要登录才能查看）
     benefit_type: BenefitType = BenefitType.CONTENT
     visibility: BenefitVisibility = BenefitVisibility.PUBLIC
     access_password: Optional[str] = None  # private类型使用
@@ -90,6 +92,7 @@ class BenefitUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     content: Optional[str] = None
+    secret: Optional[str] = None  # 秘密内容
     is_active: Optional[bool] = None
     max_claims: Optional[int] = None
 
@@ -213,34 +216,32 @@ class CDKeyClaimResult(BaseModel):
 
 # 黑名单相关模式
 class PersonalBlacklistCreate(BaseModel):
-    blacklisted_user_id: int
+    blacklisted_username: str  # 用户名而不是ID
     reason: Optional[str] = None
 
 
 class PersonalBlacklist(BaseModel):
     id: int
     creator_id: int
-    blacklisted_user_id: int
+    blacklisted_username: str  # 用户名而不是ID
     reason: Optional[str] = None
     created_at: datetime
-    blacklisted_user: User
 
     class Config:
         from_attributes = True
 
 
 class GlobalBlacklistCreate(BaseModel):
-    user_id: int
+    blacklisted_username: str  # 用户名而不是ID
     reason: Optional[str] = None
 
 
 class GlobalBlacklist(BaseModel):
     id: int
-    user_id: int
+    blacklisted_username: str  # 用户名而不是ID
     reason: Optional[str] = None
     admin_id: int
     created_at: datetime
-    user: User
     admin: User
 
     class Config:
@@ -263,3 +264,56 @@ class CreatorStats(BaseModel):
     total_cdkeys: int
     available_cdkeys: int
     blacklisted_users: int
+
+
+# 新增功能相关模式
+
+# CDKEY管理
+class CDKeyAdd(BaseModel):
+    cdkeys: list[str]  # 要添加的CDKEY列表
+
+
+class CDKeyAddResult(BaseModel):
+    success: bool
+    added_count: int
+    message: str
+
+
+# 用户历史记录
+class UserClaimHistory(BaseModel):
+    id: int
+    benefit_id: int
+    benefit_title: str
+    benefit_type: str
+    cdkey_content: Optional[str] = None  # 如果是CDKEY类型
+    claimed_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class UserClaimHistoryResponse(BaseModel):
+    claims: list[UserClaimHistory]
+    total_count: int
+
+
+# 福利删除确认
+class BenefitDeleteConfirm(BaseModel):
+    confirm: bool = True
+
+
+# 福利详情（包含秘密内容）
+class BenefitWithSecret(Benefit):
+    secret_content: Optional[str] = None  # 只有登录用户才能看到
+
+
+# 管理接口
+class BenefitManagement(BaseModel):
+    """创建者管理自己的福利"""
+    id: int
+    title: str
+    benefit_type: str
+    is_active: bool
+    total_claims: int
+    available_cdkeys: int  # 可用CDKEY数量
+    created_at: datetime

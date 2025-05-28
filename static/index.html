@@ -117,6 +117,86 @@
             padding: 20px;
             color: #666;
         }
+        .nav-tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+        }
+        .tab-btn {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            font-size: 16px;
+            color: #666;
+            transition: all 0.3s;
+        }
+        .tab-btn.active {
+            color: #3498db;
+            border-bottom-color: #3498db;
+        }
+        .tab-btn:hover {
+            color: #3498db;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .benefit-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 14px;
+        }
+        .btn-danger {
+            background: #e74c3c;
+        }
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        .secret-content {
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+        .secret-label {
+            font-weight: bold;
+            color: #856404;
+            margin-bottom: 10px;
+        }
+        .history-item {
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin: 10px 0;
+            background: #f8f9fa;
+            border-radius: 0 8px 8px 0;
+        }
+        .manage-item {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            padding: 15px;
+            margin: 10px 0;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        .manage-info {
+            flex: 1;
+        }
+        .manage-actions {
+            display: flex;
+            gap: 10px;
+        }
     </style>
 </head>
 <body>
@@ -139,9 +219,34 @@
         </div>
 
         <div class="benefits-section">
-            <h3>可用福利</h3>
-            <div id="benefitsList">
-                <p>请先登录查看可用福利</p>
+            <h3>福利中心</h3>
+            
+            <!-- 导航标签 -->
+            <div class="nav-tabs">
+                <button class="tab-btn active" onclick="showTab('public')">公开福利</button>
+                <button class="tab-btn" onclick="showTab('history')" id="historyTab" style="display: none;">我的历史</button>
+                <button class="tab-btn" onclick="showTab('manage')" id="manageTab" style="display: none;">管理福利</button>
+            </div>
+
+            <!-- 公开福利列表 -->
+            <div id="publicTab" class="tab-content active">
+                <div id="benefitsList">
+                    <p class="loading">正在加载福利列表...</p>
+                </div>
+            </div>
+
+            <!-- 我的历史 -->
+            <div id="historyTab" class="tab-content">
+                <div id="claimHistory">
+                    <p class="loading">正在加载领取历史...</p>
+                </div>
+            </div>
+
+            <!-- 管理福利 -->
+            <div id="manageTab" class="tab-content">
+                <div id="managedBenefits">
+                    <p class="loading">正在加载管理的福利...</p>
+                </div>
             </div>
         </div>
 
@@ -397,6 +502,235 @@
                 }
             } catch (error) {
                 alert('网络错误: ' + error.message);
+            }
+        }
+
+        // 新增功能函数
+
+        function showTab(tabName) {
+            // 隐藏所有标签内容
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // 显示选定的标签
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            event.target.classList.add('active');
+
+            // 根据标签加载对应内容
+            if (tabName === 'public') {
+                fetchBenefits();
+            } else if (tabName === 'history' && currentToken) {
+                fetchClaimHistory();
+            } else if (tabName === 'manage' && currentToken) {
+                fetchManagedBenefits();
+            }
+        }
+
+        async function fetchClaimHistory() {
+            if (!currentToken) return;
+
+            document.getElementById('claimHistory').innerHTML = '<div class="loading">加载中...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/benefits/my/history`, {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    displayClaimHistory(data.claims);
+                } else {
+                    document.getElementById('claimHistory').innerHTML = '<p>加载失败</p>';
+                }
+            } catch (error) {
+                console.error('获取历史记录失败:', error);
+                document.getElementById('claimHistory').innerHTML = '<p>网络错误</p>';
+            }
+        }
+
+        function displayClaimHistory(claims) {
+            if (claims.length === 0) {
+                document.getElementById('claimHistory').innerHTML = '<p>暂无领取记录</p>';
+                return;
+            }
+
+            const historyHtml = claims.map(claim => {
+                return `
+                    <div class="history-item">
+                        <h4>${claim.benefit_title}</h4>
+                        <p><strong>类型:</strong> ${claim.benefit_type === 'content' ? '📄 内容福利' : '🎮 CDKEY福利'}</p>
+                        ${claim.cdkey_content ? `
+                            <div class="secret-content">
+                                <div class="secret-label">🔑 您的CDKEY:</div>
+                                <code style="background: #f8f9fa; padding: 5px; border-radius: 3px;">${claim.cdkey_content}</code>
+                            </div>
+                        ` : ''}
+                        <p><strong>领取时间:</strong> ${new Date(claim.claimed_at).toLocaleString()}</p>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('claimHistory').innerHTML = historyHtml;
+        }
+
+        async function fetchManagedBenefits() {
+            if (!currentToken) return;
+
+            document.getElementById('managedBenefits').innerHTML = '<div class="loading">加载中...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/benefits/my/managed`, {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const benefits = await response.json();
+                    displayManagedBenefits(benefits);
+                } else {
+                    document.getElementById('managedBenefits').innerHTML = '<p>加载失败</p>';
+                }
+            } catch (error) {
+                console.error('获取管理福利失败:', error);
+                document.getElementById('managedBenefits').innerHTML = '<p>网络错误</p>';
+            }
+        }
+
+        function displayManagedBenefits(benefits) {
+            if (benefits.length === 0) {
+                document.getElementById('managedBenefits').innerHTML = '<p>您还未创建任何福利</p>';
+                return;
+            }
+
+            const managedHtml = benefits.map(benefit => {
+                return `
+                    <div class="manage-item">
+                        <div class="manage-info">
+                            <h4>${benefit.title}</h4>
+                            <p><strong>类型:</strong> ${benefit.benefit_type === 'content' ? '📄 内容' : '🎮 CDKEY'}</p>
+                            <p><strong>状态:</strong> ${benefit.is_active ? '✅ 活跃' : '❌ 停用'}</p>
+                            <p><strong>领取次数:</strong> ${benefit.total_claims}</p>
+                            ${benefit.benefit_type === 'cdkey' ? `<p><strong>可用CDKEY:</strong> ${benefit.available_cdkeys}</p>` : ''}
+                            <p><strong>创建时间:</strong> ${new Date(benefit.created_at).toLocaleString()}</p>
+                        </div>
+                        <div class="manage-actions">
+                            ${benefit.benefit_type === 'cdkey' ? `
+                                <button class="btn btn-small" onclick="addCDKEYs(${benefit.id})">
+                                    ➕ 添加CDKEY
+                                </button>
+                            ` : ''}
+                            <button class="btn btn-small btn-danger" onclick="deleteBenefit(${benefit.id}, '${benefit.title}')">
+                                🗑️ 删除
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('managedBenefits').innerHTML = managedHtml;
+        }
+
+        async function addCDKEYs(benefitId) {
+            const cdkeys = prompt('请输入CDKEY列表（每行一个）:');
+            if (!cdkeys) return;
+
+            const cdkeyList = cdkeys.split('\n').filter(key => key.trim());
+            if (cdkeyList.length === 0) {
+                alert('请输入有效的CDKEY');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/benefits/${benefitId}/cdkeys/add`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        cdkeys: cdkeyList
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert(`成功添加 ${result.data.added_count} 个CDKEY`);
+                    fetchManagedBenefits(); // 刷新列表
+                } else {
+                    alert('添加失败: ' + result.detail);
+                }
+            } catch (error) {
+                alert('网络错误: ' + error.message);
+            }
+        }
+
+        async function deleteBenefit(benefitId, title) {
+            if (!confirm(`确定要删除福利 "${title}" 吗？此操作不可恢复！`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/benefits/${benefitId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert('福利已删除');
+                    fetchManagedBenefits(); // 刷新列表
+                } else {
+                    alert('删除失败: ' + result.detail);
+                }
+            } catch (error) {
+                alert('网络错误: ' + error.message);
+            }
+        }
+
+        // 更新用户信息显示时启用相关标签
+        function displayUserInfo(user) {
+            const trustLevelNames = {
+                0: '新用户', 1: '基础用户', 2: '成员', 
+                3: '资深成员', 4: '管理员', 5: '秦始皇'
+            };
+            
+            const userDetails = `
+                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                    ${user.avatar_url ? `<img src="${user.avatar_url}" alt="${user.username}" style="width: 64px; height: 64px; border-radius: 50%; border: 2px solid #007bff;">` : '<div style="width: 64px; height: 64px; border-radius: 50%; background: #ccc; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">' + user.username.charAt(0).toUpperCase() + '</div>'}
+                    <div>
+                        <h4 style="margin: 0;">${user.name || user.username}</h4>
+                        <p style="margin: 0; color: #666;">@${user.username}</p>
+                    </div>
+                </div>
+                <p><strong>信任等级:</strong> 
+                    <span class="trust-level trust-${user.trust_level}">
+                        Level ${user.trust_level} - ${trustLevelNames[user.trust_level]}
+                    </span>
+                </p>
+                <p><strong>LinuxDO ID:</strong> ${user.linuxdo_id}</p>
+                <p><strong>高级模式:</strong> ${user.advanced_mode_agreed ? '已同意' : '未同意'}</p>
+            `;
+            
+            document.getElementById('userDetails').innerHTML = userDetails;
+            document.getElementById('userInfo').style.display = 'block';
+            
+            // 显示用户相关的标签
+            document.getElementById('historyTab').style.display = 'inline-block';
+            document.getElementById('manageTab').style.display = 'inline-block';
+            
+            if (!user.advanced_mode_agreed) {
+                document.getElementById('agreeBtn').style.display = 'inline-block';
             }
         }
     </script>
